@@ -4,9 +4,11 @@ import com.channel.analysis.entity.Channel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 
 public interface ChannelRepository extends JpaRepository<Channel, Long> {
     Page<Channel> findByNameContainingIgnoreCase(String name, Pageable pageable);
     Page<Channel> findByStatus(String status, Pageable pageable);
     Page<Channel> findByNameContainingIgnoreCaseAndStatus(String name, String status, Pageable pageable);
+    List<Long> findIdByStatus(String status);
 }

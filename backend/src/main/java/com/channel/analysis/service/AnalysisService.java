@@ -5,6 +5,7 @@ import com.channel.analysis.dto.ChannelTypeReportDTO;
 import com.channel.analysis.entity.ChannelStats;
 import com.channel.analysis.repository.ChannelRepository;
 import com.channel.analysis.repository.ChannelStatsRepository;
+import com.channel.analysis.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -20,11 +21,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AnalysisService {
 
+    private static final String CHANNEL_STATUS_ACTIVE = "ACTIVE";
+
     private final ChannelRepository channelRepository;
     private final ChannelStatsRepository statsRepository;
 
     public List<AnalysisReportDTO> generateReport(LocalDate start, LocalDate end) {
-        List<ChannelStats> allStats = statsRepository.findByDateRange(start, end);
+        List<ChannelStats> allStats = getStatsByRole(start, end);
         Map<Long, List<ChannelStats>> byChannel = allStats.stream()
                 .collect(Collectors.groupingBy(s -> s.getChannel().getId()));
 
@@ -69,7 +72,7 @@ public class AnalysisService {
     }
 
     public List<ChannelTypeReportDTO> generateReportByType(LocalDate start, LocalDate end) {
-        List<ChannelStats> allStats = statsRepository.findByDateRange(start, end);
+        List<ChannelStats> allStats = getStatsByRole(start, end);
         Map<String, List<ChannelStats>> byType = allStats.stream()
                 .collect(Collectors.groupingBy(s -> {
                     String type = s.getChannel().getType();
@@ -114,5 +117,12 @@ public class AnalysisService {
 
         reports.sort(Comparator.comparing(ChannelTypeReportDTO::getRoi).reversed());
         return reports;
+    }
+
+    private List<ChannelStats> getStatsByRole(LocalDate start, LocalDate end) {
+        if (SecurityUtils.isAdmin()) {
+            return statsRepository.findByDateRange(start, end);
+        }
+        return statsRepository.findByDateRangeAndChannelStatus(CHANNEL_STATUS_ACTIVE, start, end);
     }
 }

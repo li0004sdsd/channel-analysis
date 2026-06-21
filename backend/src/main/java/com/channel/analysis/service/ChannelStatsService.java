@@ -4,8 +4,10 @@ import com.channel.analysis.dto.ChannelStatsDTO;
 import com.channel.analysis.dto.PageResult;
 import com.channel.analysis.entity.Channel;
 import com.channel.analysis.entity.ChannelStats;
+import com.channel.analysis.exception.StatsAccessDeniedException;
 import com.channel.analysis.repository.ChannelRepository;
 import com.channel.analysis.repository.ChannelStatsRepository;
+import com.channel.analysis.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,10 +24,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChannelStatsService {
 
+    private static final String CHANNEL_STATUS_ACTIVE = "ACTIVE";
+
     private final ChannelStatsRepository statsRepository;
     private final ChannelRepository channelRepository;
 
     public PageResult<ChannelStatsDTO> listStats(Long channelId, int page, int size) {
+        checkChannelAccess(channelId);
         Page<ChannelStats> pageData = statsRepository.findByChannelId(channelId,
                 PageRequest.of(page - 1, size, Sort.by("statDate").descending()));
         List<ChannelStatsDTO> records = pageData.getContent().stream().map(this::toDTO).collect(Collectors.toList());
@@ -63,6 +68,7 @@ public class ChannelStatsService {
     }
 
     public List<ChannelStatsDTO> getStatsByDateRange(Long channelId, LocalDate start, LocalDate end) {
+        checkChannelAccess(channelId);
         return statsRepository.findByChannelIdAndStatDateBetween(channelId, start, end)
                 .stream().map(this::toDTO).collect(Collectors.toList());
     }
@@ -71,7 +77,11 @@ public class ChannelStatsService {
         if (channelIds == null || channelIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        List<ChannelStats> allStats = statsRepository.findByChannelIdsAndDateRange(channelIds, start, end);
+        List<Long> accessibleChannelIds = filterAccessibleChannelIds(channelIds);
+        if (accessibleChannelIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<ChannelStats> allStats = statsRepository.findByChannelIdsAndDateRange(accessibleChannelIds, start, end);
         Map<Long, List<ChannelStats>> grouped = allStats.stream()
                 .collect(Collectors.groupingBy(s -> s.getChannel().getId(), LinkedHashMap::new, Collectors.toList()));
         Map<String, List<ChannelStatsDTO>> result = new LinkedHashMap<>();
@@ -80,6 +90,27 @@ public class ChannelStatsService {
             result.put(channelName, statsList.stream().map(this::toDTO).collect(Collectors.toList()));
         });
         return result;
+    }
+
+    private void checkChannelAccess(Long channelId) {
+        if (SecurityUtils.isAdmin()) {
+            return;
+        }
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new RuntimeException("Channel not found"));
+        if (!CHANNEL_STATUS_ACTIVE.equals(channel.getStatus())) {
+            throw new StatsAccessDeniedException("权限不足：普通用户只能查看活跃渠道的统计数据");
+        }
+    }
+
+    private List<Long> filterAccessibleChannelIds(List<Long> requestedIds) {
+        if (SecurityUtils.isAdmin()) {
+            return requestedIds;
+        }
+        List<Long> activeIds = channelRepository.findIdByStatus(CHANNEL_STATUS_ACTIVE);
+        return requestedIds.stream()
+                .filter(activeIds::contains)
+                .collect(Collectors.toList());
     }
 
     private ChannelStatsDTO toDTO(ChannelStats stats) {

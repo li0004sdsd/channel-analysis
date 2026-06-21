@@ -12,6 +12,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -28,13 +29,15 @@ public class AuthService {
         );
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        String roleName = user.getRole() != null ? user.getRole() : "USER";
         UserDetails userDetails = org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
                 .password(user.getPassword())
-                .authorities(java.util.Collections.emptyList())
+                .authorities("ROLE_" + roleName)
                 .build();
-        String token = jwtUtil.generateToken(userDetails);
-        return new AuthResponse(token, user.getUsername(), user.getEmail());
+        Map<String, Object> extraClaims = Map.of("role", roleName);
+        String token = jwtUtil.generateToken(extraClaims, userDetails);
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), roleName);
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -49,12 +52,14 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setEmail(request.getEmail());
         userRepository.save(user);
+        String roleName = user.getRole() != null ? user.getRole() : "USER";
         UserDetails userDetails = org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
                 .password(user.getPassword())
-                .authorities(java.util.Collections.emptyList())
+                .authorities("ROLE_" + roleName)
                 .build();
-        String token = jwtUtil.generateToken(userDetails);
-        return new AuthResponse(token, user.getUsername(), user.getEmail());
+        Map<String, Object> extraClaims = Map.of("role", roleName);
+        String token = jwtUtil.generateToken(extraClaims, userDetails);
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), roleName);
     }
 }
