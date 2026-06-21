@@ -4,6 +4,7 @@ import com.channel.analysis.dto.AnalysisReportDTO;
 import com.channel.analysis.dto.ApiResponse;
 import com.channel.analysis.dto.ChannelTypeReportDTO;
 import com.channel.analysis.service.AnalysisService;
+import com.channel.analysis.service.ReportCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.List;
 public class AnalysisController {
 
     private final AnalysisService analysisService;
+    private final ReportCacheService reportCacheService;
 
     @GetMapping("/report")
     public ResponseEntity<ApiResponse<List<AnalysisReportDTO>>> report(
@@ -30,5 +32,19 @@ public class AnalysisController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         return ResponseEntity.ok(ApiResponse.success(analysisService.generateReportByType(start, end)));
+    }
+
+    @DeleteMapping("/cache")
+    public ResponseEntity<ApiResponse<Void>> evictCache(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        reportCacheService.evict(start, end);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @DeleteMapping("/cache/all")
+    public ResponseEntity<ApiResponse<Void>> evictAllCache() {
+        reportCacheService.evictAll();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

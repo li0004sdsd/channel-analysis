@@ -28,6 +28,7 @@ public class ChannelStatsService {
 
     private final ChannelStatsRepository statsRepository;
     private final ChannelRepository channelRepository;
+    private final ReportCacheService reportCacheService;
 
     public PageResult<ChannelStatsDTO> listStats(Long channelId, int page, int size) {
         checkChannelAccess(channelId);
@@ -48,7 +49,9 @@ public class ChannelStatsService {
         stats.setConversions(dto.getConversions());
         stats.setCost(dto.getCost());
         stats.setRevenue(dto.getRevenue());
-        return toDTO(statsRepository.save(stats));
+        ChannelStatsDTO result = toDTO(statsRepository.save(stats));
+        reportCacheService.evictAll();
+        return result;
     }
 
     public ChannelStatsDTO updateStats(Long id, ChannelStatsDTO dto) {
@@ -60,11 +63,14 @@ public class ChannelStatsService {
         stats.setConversions(dto.getConversions());
         stats.setCost(dto.getCost());
         stats.setRevenue(dto.getRevenue());
-        return toDTO(statsRepository.save(stats));
+        ChannelStatsDTO result = toDTO(statsRepository.save(stats));
+        reportCacheService.evictAll();
+        return result;
     }
 
     public void deleteStats(Long id) {
         statsRepository.deleteById(id);
+        reportCacheService.evictAll();
     }
 
     public List<ChannelStatsDTO> getStatsByDateRange(Long channelId, LocalDate start, LocalDate end) {

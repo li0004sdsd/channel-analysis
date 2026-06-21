@@ -3,8 +3,6 @@ package com.channel.analysis.service;
 import com.channel.analysis.dto.AnalysisReportDTO;
 import com.channel.analysis.dto.ChannelTypeReportDTO;
 import com.channel.analysis.entity.ChannelStats;
-import com.channel.analysis.repository.ChannelRepository;
-import com.channel.analysis.repository.ChannelStatsRepository;
 import com.channel.analysis.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,8 +21,7 @@ public class AnalysisService {
 
     private static final String CHANNEL_STATUS_ACTIVE = "ACTIVE";
 
-    private final ChannelRepository channelRepository;
-    private final ChannelStatsRepository statsRepository;
+    private final ReportCacheService reportCacheService;
 
     public List<AnalysisReportDTO> generateReport(LocalDate start, LocalDate end) {
         List<ChannelStats> allStats = getStatsByRole(start, end);
@@ -120,9 +117,12 @@ public class AnalysisService {
     }
 
     private List<ChannelStats> getStatsByRole(LocalDate start, LocalDate end) {
+        List<ChannelStats> allStats = reportCacheService.getStatsByDateRange(start, end);
         if (SecurityUtils.isAdmin()) {
-            return statsRepository.findByDateRange(start, end);
+            return allStats;
         }
-        return statsRepository.findByDateRangeAndChannelStatus(CHANNEL_STATUS_ACTIVE, start, end);
+        return allStats.stream()
+                .filter(s -> CHANNEL_STATUS_ACTIVE.equals(s.getChannel().getStatus()))
+                .collect(Collectors.toList());
     }
 }
