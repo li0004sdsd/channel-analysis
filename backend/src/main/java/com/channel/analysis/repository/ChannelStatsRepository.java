@@ -14,7 +14,7 @@ public interface ChannelStatsRepository extends JpaRepository<ChannelStats, Long
 
     List<ChannelStats> findByChannelIdAndStatDateBetween(Long channelId, LocalDate start, LocalDate end);
 
-    @Query("SELECT s FROM ChannelStats s WHERE s.statDate BETWEEN :start AND :end")
+    @Query("SELECT s FROM ChannelStats s JOIN FETCH s.channel WHERE s.statDate BETWEEN :start AND :end")
     List<ChannelStats> findByDateRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
     @Query("SELECT s FROM ChannelStats s WHERE s.channel.id = :channelId")
