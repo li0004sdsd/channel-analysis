@@ -9,12 +9,18 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ExportService {
+
+    private static final String[] REPORT_HEADERS = {
+            "Channel", "Type", "Impressions", "Clicks", "Conversions",
+            "Cost", "Revenue", "CTR(%)", "CVR(%)", "ROI(%)", "CPC", "CPA"
+    };
 
     private final AnalysisService analysisService;
 
@@ -28,31 +34,32 @@ public class ExportService {
             headerStyle.setFont(font);
 
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"Channel", "Type", "Impressions", "Clicks", "Conversions",
-                    "Cost", "Revenue", "CTR(%)", "CVR(%)", "ROI(%)", "CPC", "CPA"};
-            for (int i = 0; i < headers.length; i++) {
+            for (int i = 0; i < REPORT_HEADERS.length; i++) {
                 Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
+                cell.setCellValue(REPORT_HEADERS[i]);
                 cell.setCellStyle(headerStyle);
             }
 
             int rowNum = 1;
             for (AnalysisReportDTO r : reports) {
                 Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(r.getChannelName());
-                row.createCell(1).setCellValue(r.getChannelType() != null ? r.getChannelType() : "");
-                row.createCell(2).setCellValue(r.getTotalImpressions());
-                row.createCell(3).setCellValue(r.getTotalClicks());
-                row.createCell(4).setCellValue(r.getTotalConversions());
-                row.createCell(5).setCellValue(r.getTotalCost().doubleValue());
-                row.createCell(6).setCellValue(r.getTotalRevenue().doubleValue());
-                row.createCell(7).setCellValue(r.getCtr().doubleValue());
-                row.createCell(8).setCellValue(r.getCvr().doubleValue());
-                row.createCell(9).setCellValue(r.getRoi().doubleValue());
-                row.createCell(10).setCellValue(r.getCpc().doubleValue());
-                row.createCell(11).setCellValue(r.getCpa().doubleValue());
+                String[] values = buildReportRow(r);
+                for (int i = 0; i < values.length; i++) {
+                    Cell cell = row.createCell(i);
+                    switch (i) {
+                        case 0, 1:
+                            cell.setCellValue(values[i]);
+                            break;
+                        case 2, 3, 4:
+                            cell.setCellValue(Long.parseLong(values[i]));
+                            break;
+                        default:
+                            cell.setCellValue(Double.parseDouble(values[i]));
+                            break;
+                    }
+                }
             }
-            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
+            for (int i = 0; i < REPORT_HEADERS.length; i++) sheet.autoSizeColumn(i);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
             return out.toByteArray();
@@ -63,25 +70,32 @@ public class ExportService {
         List<AnalysisReportDTO> reports = analysisService.generateReport(start, end);
         StringWriter sw = new StringWriter();
         try (CSVWriter writer = new CSVWriter(sw)) {
-            writer.writeNext(new String[]{"Channel", "Type", "Impressions", "Clicks", "Conversions",
-                    "Cost", "Revenue", "CTR(%)", "CVR(%)", "ROI(%)", "CPC", "CPA"});
+            writer.writeNext(REPORT_HEADERS);
             for (AnalysisReportDTO r : reports) {
-                writer.writeNext(new String[]{
-                        r.getChannelName(),
-                        r.getChannelType() != null ? r.getChannelType() : "",
-                        String.valueOf(r.getTotalImpressions()),
-                        String.valueOf(r.getTotalClicks()),
-                        String.valueOf(r.getTotalConversions()),
-                        r.getTotalCost().toPlainString(),
-                        r.getTotalRevenue().toPlainString(),
-                        r.getCtr().toPlainString(),
-                        r.getCvr().toPlainString(),
-                        r.getRoi().toPlainString(),
-                        r.getCpc().toPlainString(),
-                        r.getCpa().toPlainString()
-                });
+                writer.writeNext(buildReportRow(r));
             }
         }
         return sw.toString();
+    }
+
+    private String[] buildReportRow(AnalysisReportDTO r) {
+        return new String[]{
+                r.getChannelName(),
+                r.getChannelType() != null ? r.getChannelType() : "",
+                String.valueOf(r.getTotalImpressions()),
+                String.valueOf(r.getTotalClicks()),
+                String.valueOf(r.getTotalConversions()),
+                valueOf(r.getTotalCost()),
+                valueOf(r.getTotalRevenue()),
+                valueOf(r.getCtr()),
+                valueOf(r.getCvr()),
+                valueOf(r.getRoi()),
+                valueOf(r.getCpc()),
+                valueOf(r.getCpa())
+        };
+    }
+
+    private String valueOf(BigDecimal v) {
+        return v.toPlainString();
     }
 }
