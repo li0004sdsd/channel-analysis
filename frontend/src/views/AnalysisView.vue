@@ -14,9 +14,15 @@
           />
         </el-col>
         <el-col :span="4">
+          <el-radio-group v-model="viewMode" size="default">
+            <el-radio-button label="channel">By Channel</el-radio-button>
+            <el-radio-button label="type">By Type</el-radio-button>
+          </el-radio-group>
+        </el-col>
+        <el-col :span="4">
           <el-button type="primary" @click="loadReport" :loading="loading">Generate Report</el-button>
         </el-col>
-        <el-col :span="12" style="text-align: right;" v-if="reportData.length > 0">
+        <el-col :span="8" style="text-align: right;" v-if="reportData.length > 0">
           <el-button @click="exportFile('csv')">Export CSV</el-button>
           <el-button type="success" @click="exportFile('excel')">Export Excel</el-button>
         </el-col>
@@ -25,38 +31,38 @@
 
     <el-card shadow="never" v-if="reportData.length > 0">
       <el-table :data="reportData" stripe border>
-        <el-table-column prop="channelName" label="Channel" min-width="120" />
-        <el-table-column prop="channelType" label="Type" width="100" />
-        <el-table-column prop="totalImpressions" label="Impressions" />
-        <el-table-column prop="totalClicks" label="Clicks" />
-        <el-table-column prop="totalConversions" label="Conversions" />
-        <el-table-column label="Cost">
+        <el-table-column v-if="viewMode === 'channel'" prop="channelName" label="Channel" min-width="120" />
+        <el-table-column :prop="viewMode === 'type' ? 'channelType' : 'channelType'" :label="viewMode === 'type' ? 'Channel Type' : 'Type'" width="120" />
+        <el-table-column prop="totalImpressions" label="Impressions" sortable />
+        <el-table-column prop="totalClicks" label="Clicks" sortable />
+        <el-table-column prop="totalConversions" label="Conversions" sortable />
+        <el-table-column label="Cost" sortable>
           <template #default="{ row }">¥{{ Number(row.totalCost).toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column label="Revenue">
+        <el-table-column label="Revenue" sortable>
           <template #default="{ row }">¥{{ Number(row.totalRevenue).toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column label="CTR(%)">
+        <el-table-column label="CTR(%)" sortable>
           <template #default="{ row }">
             <el-tag :type="row.ctr >= 5 ? 'success' : 'warning'">{{ Number(row.ctr).toFixed(2) }}%</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="CVR(%)">
+        <el-table-column label="CVR(%)" sortable>
           <template #default="{ row }">
             <el-tag :type="row.cvr >= 3 ? 'success' : 'warning'">{{ Number(row.cvr).toFixed(2) }}%</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="ROI(%)">
+        <el-table-column label="ROI(%)" sortable>
           <template #default="{ row }">
             <el-tag :type="row.roi >= 100 ? 'success' : row.roi >= 0 ? 'warning' : 'danger'">
               {{ Number(row.roi).toFixed(2) }}%
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="CPC">
+        <el-table-column label="CPC" sortable>
           <template #default="{ row }">¥{{ Number(row.cpc).toFixed(4) }}</template>
         </el-table-column>
-        <el-table-column label="CPA">
+        <el-table-column label="CPA" sortable>
           <template #default="{ row }">¥{{ Number(row.cpa).toFixed(4) }}</template>
         </el-table-column>
       </el-table>
@@ -76,6 +82,7 @@ const dateRange = ref([
   new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
   new Date().toISOString().split('T')[0]
 ])
+const viewMode = ref('channel')
 const reportData = ref([])
 const loading = ref(false)
 
@@ -86,7 +93,9 @@ async function loadReport() {
   }
   loading.value = true
   try {
-    const res = await analysisApi.report({ start: dateRange.value[0], end: dateRange.value[1] })
+    const params = { start: dateRange.value[0], end: dateRange.value[1] }
+    const apiCall = viewMode.value === 'type' ? analysisApi.reportByType(params) : analysisApi.report(params)
+    const res = await apiCall
     reportData.value = res.data.data
     if (reportData.value.length === 0) {
       ElMessage.info('No data found for the selected period')
