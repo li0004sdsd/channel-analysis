@@ -12,7 +12,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -62,6 +65,21 @@ public class ChannelStatsService {
     public List<ChannelStatsDTO> getStatsByDateRange(Long channelId, LocalDate start, LocalDate end) {
         return statsRepository.findByChannelIdAndStatDateBetween(channelId, start, end)
                 .stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    public Map<String, List<ChannelStatsDTO>> getBatchStatsByDateRange(List<Long> channelIds, LocalDate start, LocalDate end) {
+        if (channelIds == null || channelIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<ChannelStats> allStats = statsRepository.findByChannelIdsAndDateRange(channelIds, start, end);
+        Map<Long, List<ChannelStats>> grouped = allStats.stream()
+                .collect(Collectors.groupingBy(s -> s.getChannel().getId(), LinkedHashMap::new, Collectors.toList()));
+        Map<String, List<ChannelStatsDTO>> result = new LinkedHashMap<>();
+        grouped.forEach((channelId, statsList) -> {
+            String channelName = statsList.get(0).getChannel().getName();
+            result.put(channelName, statsList.stream().map(this::toDTO).collect(Collectors.toList()));
+        });
+        return result;
     }
 
     private ChannelStatsDTO toDTO(ChannelStats stats) {

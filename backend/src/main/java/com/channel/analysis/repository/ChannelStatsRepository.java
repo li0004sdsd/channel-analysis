@@ -19,4 +19,7 @@ public interface ChannelStatsRepository extends JpaRepository<ChannelStats, Long
 
     @Query("SELECT s FROM ChannelStats s WHERE s.channel.id = :channelId")
     List<ChannelStats> findAllByChannelId(@Param("channelId") Long channelId);
+
+    @Query("SELECT s FROM ChannelStats s JOIN FETCH s.channel WHERE s.channel.id IN :channelIds AND s.statDate BETWEEN :start AND :end ORDER BY s.channel.id, s.statDate ASC")
+    List<ChannelStats> findByChannelIdsAndDateRange(@Param("channelIds") List<Long> channelIds, @Param("start") LocalDate start, @Param("end") LocalDate end);
 }

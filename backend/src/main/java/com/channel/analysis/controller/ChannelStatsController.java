@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/stats")
@@ -48,5 +49,13 @@ public class ChannelStatsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         return ResponseEntity.ok(ApiResponse.success(statsService.getStatsByDateRange(channelId, start, end)));
+    }
+
+    @GetMapping("/batch")
+    public ResponseEntity<ApiResponse<Map<String, List<ChannelStatsDTO>>>> getBatch(
+            @RequestParam List<Long> channelIds,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        return ResponseEntity.ok(ApiResponse.success(statsService.getBatchStatsByDateRange(channelIds, start, end)));
     }
 }

@@ -7,7 +7,26 @@
             <el-option v-for="c in allChannels" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-col>
-        <el-col :span="4" style="text-align: right;">
+        <el-col :span="6">
+          <el-select v-model="selectedChannels" multiple placeholder="Batch: select channels" style="width: 100%;" collapse-tags collapse-tags-tooltip>
+            <el-option v-for="c in allChannels" :key="c.id" :label="c.name" :value="c.id" />
+          </el-select>
+        </el-col>
+        <el-col :span="4">
+          <el-date-picker
+            v-model="batchDateRange"
+            type="daterange"
+            range-separator="-"
+            start-placeholder="Start"
+            end-placeholder="End"
+            value-format="YYYY-MM-DD"
+            style="width: 100%;"
+          />
+        </el-col>
+        <el-col :span="2">
+          <el-button type="primary" :disabled="selectedChannels.length === 0" @click="loadBatchStats" :loading="batchLoading">Batch Query</el-button>
+        </el-col>
+        <el-col :span="6" style="text-align: right;">
           <el-button type="primary" :disabled="!selectedChannel" @click="showAddDialog = true">
             <el-icon><Plus /></el-icon> Add Record
           </el-button>
@@ -15,7 +34,7 @@
       </el-row>
     </el-card>
 
-    <el-card shadow="never">
+    <el-card shadow="never" v-if="viewMode === 'single'">
       <el-table :data="statsList" v-loading="loading" stripe>
         <el-table-column prop="statDate" label="Date" />
         <el-table-column prop="impressions" label="Impressions" />
@@ -44,6 +63,27 @@
         />
       </div>
     </el-card>
+
+    <div v-if="viewMode === 'batch'">
+      <el-card v-for="(records, channelName) in batchData" :key="channelName" shadow="never" style="margin-bottom: 16px;">
+        <template #header><strong>{{ channelName }}</strong></template>
+        <el-table :data="records" stripe border size="small">
+          <el-table-column prop="statDate" label="Date" />
+          <el-table-column prop="impressions" label="Impressions" />
+          <el-table-column prop="clicks" label="Clicks" />
+          <el-table-column prop="conversions" label="Conversions" />
+          <el-table-column label="Cost">
+            <template #default="{ row }">¥{{ row.cost }}</template>
+          </el-table-column>
+          <el-table-column label="Revenue">
+            <template #default="{ row }">¥{{ row.revenue }}</template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+      <el-empty v-if="Object.keys(batchData).length === 0" description="No data found for the selected channels and date range" />
+    </div>
+
+    <el-empty v-if="viewMode === 'single' && statsList.length === 0 && !loading" description="Select a channel to view stats" />
 
     <el-dialog v-model="showAddDialog" :title="editingId ? 'Edit Record' : 'Add Stats Record'" width="500px">
       <el-form :model="statsForm" ref="statsFormRef" label-width="120px">
@@ -82,10 +122,18 @@ import { statsApi } from '@/api/stats.js'
 
 const allChannels = ref([])
 const selectedChannel = ref(null)
+const selectedChannels = ref([])
+const batchDateRange = ref([
+  new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
+  new Date().toISOString().split('T')[0]
+])
 const statsList = ref([])
+const batchData = ref({})
 const total = ref(0)
 const loading = ref(false)
+const batchLoading = ref(false)
 const saving = ref(false)
+const viewMode = ref('single')
 const showAddDialog = ref(false)
 const editingId = ref(null)
 const statsFormRef = ref(null)
@@ -107,6 +155,7 @@ onMounted(async () => {
 
 async function loadStats() {
   if (!selectedChannel.value) return
+  viewMode.value = 'single'
   loading.value = true
   try {
     const res = await statsApi.list(selectedChannel.value, { page: pagination.page, size: pagination.size })
@@ -114,6 +163,30 @@ async function loadStats() {
     total.value = res.data.data.total
   } finally {
     loading.value = false
+  }
+}
+
+async function loadBatchStats() {
+  if (selectedChannels.value.length === 0) {
+    ElMessage.warning('Please select at least one channel')
+    return
+  }
+  if (!batchDateRange.value || batchDateRange.value.length < 2) {
+    ElMessage.warning('Please select a date range')
+    return
+  }
+  batchLoading.value = true
+  viewMode.value = 'batch'
+  try {
+    const params = {
+      channelIds: selectedChannels.value.join(','),
+      start: batchDateRange.value[0],
+      end: batchDateRange.value[1]
+    }
+    const res = await statsApi.batch(params)
+    batchData.value = res.data.data
+  } finally {
+    batchLoading.value = false
   }
 }
 

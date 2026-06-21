@@ -4,5 +4,6 @@ export const statsApi = {
   create: (data) => request.post('/stats', data),
   update: (id, data) => request.put(`/stats/${id}`, data),
   remove: (id) => request.delete(`/stats/${id}`),
-  range: (params) => request.get('/stats/range', { params })
+  range: (params) => request.get('/stats/range', { params }),
+  batch: (params) => request.get('/stats/batch', { params })
 }
