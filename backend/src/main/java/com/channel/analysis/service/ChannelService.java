@@ -12,10 +12,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,9 +45,9 @@ public class ChannelService {
             pageData = channelRepository.findAll(pageable);
         }
         List<Channel> channels = pageData.getContent();
-        Map<Long, BigDecimal> monthlySpentMap = loadMonthlySpentMap(channels);
+        Map<Long, BigDecimal> spentMap = resolveMonthlySpentForChannels(channels);
         List<ChannelDTO> records = channels.stream()
-                .map(ch -> toDTO(ch, monthlySpentMap.get(ch.getId())))
+                .map(ch -> toDTO(ch, spentMap.get(ch.getId())))
                 .collect(Collectors.toList());
         return new PageResult<>(records, pageData.getTotalElements(), page, size);
     }
@@ -53,10 +55,11 @@ public class ChannelService {
     public ChannelDTO getChannel(Long id) {
         Channel channel = channelRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Channel not found: " + id));
-        BigDecimal monthlySpent = calculateMonthlySpent(channel.getId());
-        return toDTO(channel, monthlySpent);
+        BigDecimal spent = resolveMonthlySpent(channel);
+        return toDTO(channel, spent);
     }
 
+    @Transactional
     public ChannelDTO createChannel(ChannelDTO dto) {
         Channel channel = new Channel();
         channel.setName(dto.getName());
@@ -69,10 +72,11 @@ public class ChannelService {
         channel.setCreatedAt(LocalDateTime.now());
         channel.setUpdatedAt(LocalDateTime.now());
         Channel saved = channelRepository.save(channel);
-        BigDecimal monthlySpent = calculateMonthlySpent(saved.getId());
-        return toDTO(saved, monthlySpent);
+        BigDecimal spent = resolveMonthlySpent(saved);
+        return toDTO(saved, spent);
     }
 
+    @Transactional
     public ChannelDTO updateChannel(Long id, ChannelDTO dto) {
         Channel channel = channelRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Channel not found: " + id));
@@ -87,8 +91,8 @@ public class ChannelService {
         channel.setStatus(dto.getStatus());
         channel.setUpdatedAt(LocalDateTime.now());
         Channel saved = channelRepository.save(channel);
-        BigDecimal monthlySpent = calculateMonthlySpent(saved.getId());
-        return toDTO(saved, monthlySpent);
+        BigDecimal spent = resolveMonthlySpent(saved);
+        return toDTO(saved, spent);
     }
 
     public void deleteChannel(Long id) {
@@ -97,42 +101,65 @@ public class ChannelService {
 
     public List<ChannelDTO> getAllChannels() {
         List<Channel> channels = channelRepository.findAll();
-        Map<Long, BigDecimal> monthlySpentMap = loadMonthlySpentMap(channels);
+        Map<Long, BigDecimal> spentMap = resolveMonthlySpentForChannels(channels);
         return channels.stream()
-                .map(ch -> toDTO(ch, monthlySpentMap.get(ch.getId())))
+                .map(ch -> toDTO(ch, spentMap.get(ch.getId())))
                 .collect(Collectors.toList());
     }
 
-    private Map<Long, BigDecimal> loadMonthlySpentMap(List<Channel> channels) {
+    private Map<Long, BigDecimal> resolveMonthlySpentForChannels(List<Channel> channels) {
         if (channels == null || channels.isEmpty()) {
             return new HashMap<>();
         }
-        List<Long> channelIds = channels.stream().map(Channel::getId).collect(Collectors.toList());
-        LocalDate[] range = currentMonthRange();
-        List<Object[]> results = channelStatsRepository.sumCostByChannelIdsAndDateRange(channelIds, range[0], range[1]);
-        Map<Long, BigDecimal> map = new HashMap<>();
-        for (Object[] row : results) {
-            Long channelId = (Long) row[0];
-            BigDecimal spent = (BigDecimal) row[1];
-            map.put(channelId, spent != null ? spent : BigDecimal.ZERO);
+        YearMonth currentYm = YearMonth.now();
+        LocalDate monthStart = currentYm.atDay(1);
+
+        Map<Long, BigDecimal> cacheHits = new HashMap<>();
+        List<Long> needRecomputeIds = new java.util.ArrayList<>();
+
+        for (Channel ch : channels) {
+            if (isCacheValid(ch, currentYm)) {
+                cacheHits.put(ch.getId(), ch.getMonthlySpent() != null ? ch.getMonthlySpent() : BigDecimal.ZERO);
+            } else {
+                needRecomputeIds.add(ch.getId());
+            }
         }
-        for (Long id : channelIds) {
-            map.putIfAbsent(id, BigDecimal.ZERO);
+
+        if (!needRecomputeIds.isEmpty()) {
+            LocalDate end = currentYm.atEndOfMonth();
+            List<Object[]> rows = channelStatsRepository.sumCostByChannelIdsAndDateRange(needRecomputeIds, monthStart, end);
+            Map<Long, BigDecimal> recomputed = new HashMap<>();
+            for (Object[] r : rows) {
+                Long id = (Long) r[0];
+                BigDecimal v = (BigDecimal) r[1];
+                recomputed.put(id, v != null ? v : BigDecimal.ZERO);
+            }
+            for (Long id : needRecomputeIds) {
+                recomputed.putIfAbsent(id, BigDecimal.ZERO);
+            }
+            cacheHits.putAll(recomputed);
         }
-        return map;
+
+        return cacheHits;
     }
 
-    private BigDecimal calculateMonthlySpent(Long channelId) {
-        LocalDate[] range = currentMonthRange();
-        BigDecimal spent = channelStatsRepository.sumCostByChannelIdAndDateRange(channelId, range[0], range[1]);
-        return spent != null ? spent : BigDecimal.ZERO;
+    private BigDecimal resolveMonthlySpent(Channel channel) {
+        YearMonth currentYm = YearMonth.now();
+        if (isCacheValid(channel, currentYm)) {
+            return channel.getMonthlySpent() != null ? channel.getMonthlySpent() : BigDecimal.ZERO;
+        }
+        LocalDate start = currentYm.atDay(1);
+        LocalDate end = currentYm.atEndOfMonth();
+        BigDecimal v = channelStatsRepository.sumCostByChannelIdAndDateRange(channel.getId(), start, end);
+        return v != null ? v : BigDecimal.ZERO;
     }
 
-    private LocalDate[] currentMonthRange() {
-        LocalDate today = LocalDate.now();
-        LocalDate start = today.withDayOfMonth(1);
-        LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
-        return new LocalDate[]{start, end};
+    private boolean isCacheValid(Channel ch, YearMonth currentYm) {
+        if (ch.getSpentMonth() == null) {
+            return false;
+        }
+        YearMonth cacheYm = YearMonth.from(ch.getSpentMonth());
+        return cacheYm.equals(currentYm) && ch.getMonthlySpent() != null;
     }
 
     private BudgetStatus computeBudgetStatus(BigDecimal monthlyBudget, BigDecimal alertRatio, BigDecimal monthlySpent) {

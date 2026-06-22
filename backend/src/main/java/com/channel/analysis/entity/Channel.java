@@ -3,6 +3,7 @@ package com.channel.analysis.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -30,6 +31,15 @@ public class Channel {
 
     @Column(name = "alert_ratio", precision = 5, scale = 2)
     private BigDecimal alertRatio = new BigDecimal("0.80");
+
+    @Column(name = "monthly_spent", precision = 15, scale = 2)
+    private BigDecimal monthlySpent = BigDecimal.ZERO;
+
+    @Column(name = "spent_month")
+    private LocalDate spentMonth;
+
+    @Version
+    private Long version;
 
     @Column(length = 20)
     private String status = "ACTIVE";

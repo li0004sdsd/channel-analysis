@@ -20,9 +20,11 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -73,11 +75,44 @@ public class ChannelStatsImportService {
 
         if (!validEntities.isEmpty()) {
             statsRepository.saveAll(validEntities);
+            applyMonthlySpentDeltas(validEntities);
             reportCacheService.evictAll();
             log.info("批量导入完成，成功写入 {} 条记录", validEntities.size());
         }
 
         return ImportResult.of(rowResults, false);
+    }
+
+    private void applyMonthlySpentDeltas(List<ChannelStats> validEntities) {
+        Map<Long, Map<YearMonth, BigDecimal>> deltasByChannelMonth = new HashMap<>();
+        for (ChannelStats s : validEntities) {
+            Long channelId = s.getChannel().getId();
+            YearMonth ym = YearMonth.from(s.getStatDate());
+            deltasByChannelMonth
+                    .computeIfAbsent(channelId, k -> new HashMap<>())
+                    .merge(ym, s.getCost(), BigDecimal::add);
+        }
+        YearMonth currentYm = YearMonth.now();
+        for (Map.Entry<Long, Map<YearMonth, BigDecimal>> ce : deltasByChannelMonth.entrySet()) {
+            Long channelId = ce.getKey();
+            for (Map.Entry<YearMonth, BigDecimal> me : ce.getValue().entrySet()) {
+                YearMonth ym = me.getKey();
+                BigDecimal delta = me.getValue();
+                LocalDate targetMonth = ym.atDay(1);
+                if (ym.equals(currentYm)) {
+                    int updated = channelRepository.incrementMonthlySpent(channelId, delta, targetMonth);
+                    if (updated == 0) {
+                        channelRepository.resetAndSetMonthlySpent(channelId, delta, targetMonth);
+                        int retry = channelRepository.incrementMonthlySpent(channelId, delta, targetMonth);
+                        if (retry == 0) {
+                            log.warn("渠道 {} 月度花费原子更新未生效，将由查询时回源兜底", channelId);
+                        }
+                    }
+                } else {
+                    log.debug("跳过非当月({})渠道 {} 月度缓存更新，非查询热点月不维护缓存", ym, channelId);
+                }
+            }
+        }
     }
 
     private List<String[]> parseCsv(MultipartFile file) throws IOException {
