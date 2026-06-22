@@ -4,7 +4,7 @@ import com.channel.analysis.dto.AnalysisReportDTO;
 import com.channel.analysis.dto.ApiResponse;
 import com.channel.analysis.dto.ChannelTypeReportDTO;
 import com.channel.analysis.service.AnalysisService;
-import com.channel.analysis.service.ReportCacheService;
+import com.channel.analysis.service.ReportCacheOperations;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +18,7 @@ import java.util.List;
 public class AnalysisController {
 
     private final AnalysisService analysisService;
-    private final ReportCacheService reportCacheService;
+    private final ReportCacheOperations reportCacheService;
 
     @GetMapping("/report")
     public ResponseEntity<ApiResponse<List<AnalysisReportDTO>>> report(

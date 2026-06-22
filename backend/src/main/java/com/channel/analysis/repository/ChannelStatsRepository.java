@@ -10,6 +10,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface ChannelStatsRepository extends JpaRepository<ChannelStats, Long> {
+
+    @Query("SELECT s.channel.id, s.statDate FROM ChannelStats s WHERE s.channel.id IN :channelIds AND s.statDate IN :statDates")
+    List<Object[]> findExistingChannelDatePairs(@Param("channelIds") List<Long> channelIds, @Param("statDates") List<LocalDate> statDates);
+
+    boolean existsByChannelIdAndStatDate(Long channelId, LocalDate statDate);
     Page<ChannelStats> findByChannelId(Long channelId, Pageable pageable);
 
     List<ChannelStats> findByChannelIdAndStatDateBetween(Long channelId, LocalDate start, LocalDate end);

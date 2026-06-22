@@ -28,7 +28,7 @@ public class ChannelStatsService {
 
     private final ChannelStatsRepository statsRepository;
     private final ChannelRepository channelRepository;
-    private final ReportCacheService reportCacheService;
+    private final ReportCacheOperations reportCacheService;
 
     public PageResult<ChannelStatsDTO> listStats(Long channelId, int page, int size) {
         checkChannelAccess(channelId);

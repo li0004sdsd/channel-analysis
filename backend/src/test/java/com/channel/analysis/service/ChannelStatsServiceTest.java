@@ -41,7 +41,7 @@ class ChannelStatsServiceTest {
     private ChannelRepository channelRepository;
 
     @Mock
-    private ReportCacheService reportCacheService;
+    private ReportCacheOperations reportCacheService;
 
     @InjectMocks
     private ChannelStatsService statsService;

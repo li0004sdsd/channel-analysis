@@ -21,7 +21,7 @@ public class AnalysisService {
 
     private static final String CHANNEL_STATUS_ACTIVE = "ACTIVE";
 
-    private final ReportCacheService reportCacheService;
+    private final ReportCacheOperations reportCacheService;
 
     public List<AnalysisReportDTO> generateReport(LocalDate start, LocalDate end) {
         List<ChannelStats> allStats = getStatsByRole(start, end);

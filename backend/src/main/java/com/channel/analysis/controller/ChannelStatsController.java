@@ -2,12 +2,15 @@ package com.channel.analysis.controller;
 
 import com.channel.analysis.dto.ApiResponse;
 import com.channel.analysis.dto.ChannelStatsDTO;
+import com.channel.analysis.dto.ImportResult;
 import com.channel.analysis.dto.PageResult;
+import com.channel.analysis.service.ChannelStatsImportService;
 import com.channel.analysis.service.ChannelStatsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +21,7 @@ import java.util.Map;
 public class ChannelStatsController {
 
     private final ChannelStatsService statsService;
+    private final ChannelStatsImportService importService;
 
     @GetMapping("/channel/{channelId}")
     public ResponseEntity<ApiResponse<PageResult<ChannelStatsDTO>>> list(
@@ -57,5 +61,11 @@ public class ChannelStatsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         return ResponseEntity.ok(ApiResponse.success(statsService.getBatchStatsByDateRange(channelIds, start, end)));
+    }
+
+    @PostMapping("/import")
+    public ResponseEntity<ApiResponse<ImportResult>> importCsv(@RequestParam("file") MultipartFile file) throws Exception {
+        ImportResult result = importService.importCsv(file);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Service
-public class ReportCacheService {
+public class ReportCacheService implements ReportCacheOperations {
 
     private static final long CACHE_TTL_MINUTES = 5L;
 

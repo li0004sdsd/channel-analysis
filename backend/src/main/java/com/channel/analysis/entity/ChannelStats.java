@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "channel_stats")
+@Table(name = "channel_stats", uniqueConstraints = @UniqueConstraint(columnNames = {"channel_id", "stat_date"}))
 public class ChannelStats {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
