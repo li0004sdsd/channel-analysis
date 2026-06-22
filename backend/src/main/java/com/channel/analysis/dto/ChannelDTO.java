@@ -13,6 +13,11 @@ public class ChannelDTO {
     private String type;
     private String description;
     private BigDecimal budget;
+    private BigDecimal monthlyBudget;
+    private BigDecimal alertRatio;
+    private BigDecimal monthlySpent;
+    private BigDecimal budgetUtilizationRate;
+    private String budgetStatus;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

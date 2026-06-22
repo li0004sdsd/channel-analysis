@@ -33,4 +33,10 @@ public interface ChannelStatsRepository extends JpaRepository<ChannelStats, Long
 
     @Query("SELECT s FROM ChannelStats s JOIN FETCH s.channel WHERE s.channel.status = :status AND s.channel.id IN :channelIds AND s.statDate BETWEEN :start AND :end ORDER BY s.channel.id, s.statDate ASC")
     List<ChannelStats> findByChannelIdsAndDateRangeAndChannelStatus(@Param("channelIds") List<Long> channelIds, @Param("status") String status, @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    @Query("SELECT COALESCE(SUM(s.cost), 0) FROM ChannelStats s WHERE s.channel.id = :channelId AND s.statDate BETWEEN :start AND :end")
+    BigDecimal sumCostByChannelIdAndDateRange(@Param("channelId") Long channelId, @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    @Query("SELECT s.channel.id, COALESCE(SUM(s.cost), 0) FROM ChannelStats s WHERE s.channel.id IN :channelIds AND s.statDate BETWEEN :start AND :end GROUP BY s.channel.id")
+    List<Object[]> sumCostByChannelIdsAndDateRange(@Param("channelIds") List<Long> channelIds, @Param("start") LocalDate start, @Param("end") LocalDate end);
 }

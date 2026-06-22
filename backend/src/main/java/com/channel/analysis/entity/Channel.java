@@ -25,6 +25,12 @@ public class Channel {
     @Column(precision = 15, scale = 2)
     private BigDecimal budget;
 
+    @Column(name = "monthly_budget", precision = 15, scale = 2)
+    private BigDecimal monthlyBudget;
+
+    @Column(name = "alert_ratio", precision = 5, scale = 2)
+    private BigDecimal alertRatio = new BigDecimal("0.80");
+
     @Column(length = 20)
     private String status = "ACTIVE";
 
